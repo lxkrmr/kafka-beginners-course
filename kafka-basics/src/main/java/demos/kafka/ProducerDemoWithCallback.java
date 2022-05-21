@@ -50,6 +50,12 @@ public class ProducerDemoWithCallback {
                     log.error("Error while producing", e);
                 }
             });
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
         // flush and close the Producer - synchronous
