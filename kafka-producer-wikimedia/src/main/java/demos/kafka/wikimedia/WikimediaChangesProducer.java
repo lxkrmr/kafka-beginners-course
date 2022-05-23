@@ -40,6 +40,11 @@ public class WikimediaChangesProducer {
         // the leader counts as a replica, so 2 means the leader and 1 replica has to confirm the message
         properties.setProperty(ProducerConfig.RETRIES_CONFIG, Integer.toString(Integer.MAX_VALUE));
 
+        // high throughput producer (ath the expense of a bit of latency and CPU usage)
+        properties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy"); // for text based messages
+        properties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "20");
+        properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32*1024)); // 32kb
+
         // create the Producer
         KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
 
