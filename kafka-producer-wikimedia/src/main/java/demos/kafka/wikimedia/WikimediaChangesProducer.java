@@ -29,6 +29,17 @@ public class WikimediaChangesProducer {
         properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
+        // the following properties are not needed anymore with kafka version 3.0.0 as they are already set by default
+        // set safe producer configs (Kafka <= 2.8)
+        properties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        properties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+        // fyi: ACK CONFIG all means that we want to get an ack if all in sync replicas ISR are conforming to push
+        // the message to their log
+        // this producer setting has a related config in the broker called: min.insync.replicas=2
+        // this means that here 2 replicas has to confirm the message to fulfill the ack all from the producer
+        // the leader counts as a replica, so 2 means the leader and 1 replica has to confirm the message
+        properties.setProperty(ProducerConfig.RETRIES_CONFIG, Integer.toString(Integer.MAX_VALUE));
+
         // create the Producer
         KafkaProducer<String, String> producer = new KafkaProducer<>(properties);
 
@@ -40,6 +51,6 @@ public class WikimediaChangesProducer {
         eventSource.start();
 
         // we produce for 10 minutes  and block the programm until then
-        TimeUnit.MINUTES.sleep(10);
+        TimeUnit.MINUTES.sleep(1);
     }
 }
