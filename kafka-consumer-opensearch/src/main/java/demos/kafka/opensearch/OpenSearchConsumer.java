@@ -1,5 +1,6 @@
 package demos.kafka.opensearch;
 
+import com.google.gson.JsonParser;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -83,6 +84,15 @@ public class OpenSearchConsumer {
         return new KafkaConsumer<>(properties);
     }
 
+    private static String extractId(String json) {
+        return JsonParser.parseString(json)
+                .getAsJsonObject()
+                .get("meta")
+                .getAsJsonObject()
+                .get("id")
+                .getAsString();
+    }
+
     public static void main(String[] args) throws IOException {
         // first create an OpenSearch Client
         RestHighLevelClient openSearchClient = createOpenSearchClient();
@@ -113,15 +123,18 @@ public class OpenSearchConsumer {
                 log.info("Received: %s record(s)".formatted(records.count()));
 
                 for(ConsumerRecord<String, String> record: records) {
-                    // Idempotence
-                    // strategy 1: define an ID using Kafka Record coordinates
-                    String id = "%s_%s_%s".formatted(record.topic(), record.partition(), record.offset());
-
                     // send the record into OpenSearch
                     try {
+                        // Idempotence
+                        // strategy 1: define an ID using Kafka Record coordinates
+                        // String id = "%s_%s_%s".formatted(record.topic(), record.partition(), record.offset());
+                        // strategy 2: extract id from the json value - preferred if the data provides an id
+                        String id = extractId(record.value());
+
                         IndexRequest indexRequest = new IndexRequest(WIKIMEDIA_OPENSEARCH_INDEX)
                                 .source(record.value(), XContentType.JSON)
                                 .id(id);
+
                         IndexResponse indexResponse = openSearchClient.index(indexRequest, RequestOptions.DEFAULT);
                         log.info("Inserted 1 document into OpenSearch with id: %s".formatted(indexResponse.getId()));
                     } catch (OpenSearchStatusException osse) {
