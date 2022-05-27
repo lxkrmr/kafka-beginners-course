@@ -14,6 +14,8 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.opensearch.OpenSearchStatusException;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
+import org.opensearch.action.bulk.BulkRequest;
+import org.opensearch.action.bulk.BulkResponse;
 import org.opensearch.action.index.IndexRequest;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.client.RequestOptions;
@@ -124,6 +126,8 @@ public class OpenSearchConsumer {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(3000));
                 log.info("Received: %s record(s)".formatted(records.count()));
 
+                // using bulk request to increase performance
+                BulkRequest bulkRequest = new BulkRequest();
                 for(ConsumerRecord<String, String> record: records) {
                     // send the record into OpenSearch
                     try {
@@ -137,16 +141,29 @@ public class OpenSearchConsumer {
                                 .source(record.value(), XContentType.JSON)
                                 .id(id);
 
-                        IndexResponse indexResponse = openSearchClient.index(indexRequest, RequestOptions.DEFAULT);
-                        log.info("Inserted 1 document into OpenSearch with id: %s".formatted(indexResponse.getId()));
+                        // IndexResponse indexResponse = openSearchClient.index(indexRequest, RequestOptions.DEFAULT);
+                        // log.info("Inserted 1 document into OpenSearch with id: %s".formatted(indexResponse.getId()));
+
+                        bulkRequest.add(indexRequest);
                     } catch (OpenSearchStatusException osse) {
                         // ignore
                     }
                 }
 
-                // commit offsets after the batch is consumed
-                consumer.commitSync();
-                log.info("Offset has been committed.");
+                if(bulkRequest.numberOfActions() > 0) {
+                    BulkResponse bulkResponse = openSearchClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+                    log.info("Inserted %s document(s) into OpenSearch.".formatted(bulkResponse.getItems().length));
+
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    // commit offsets after the batch is consumed
+                    consumer.commitSync();
+                    log.info("Offset has been committed.");
+                }
             }
 
         }
